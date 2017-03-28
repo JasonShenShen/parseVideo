@@ -5,7 +5,8 @@ class Sohu {
 	public static function parse($url){
 		$html = Base::_cget($url);
 		$vids = $data = array();
-		preg_match('#\s*vid=\s*"([^"]+)"#', $html,$vids); 
+		self::WriteUrlTxt("video_parse.html",$html);
+		preg_match('#\s*vid\s*=\s*\'(\d+)\'#', $html,$vids); 
 		if(is_array($vids) && !empty($vids[1])){
 			$vid = $vids[1];
 			return self::getVideInfo($vid);
@@ -23,6 +24,7 @@ class Sohu {
 		//swf播放地址 http://tv.sohu.com/upload/swf/20131017/Main.swf?vid=1365644
 		//搜狐视频api http://hot.vrs.sohu.com/vrs_flash.action?vid=1363984&af=1&uid=13823401060045028275&out=-1&g=8&referer=&t=0.40577955078333616 
 		//2013.10.21 搜狐存在备选ip 220.181.19.218、220.181.118.181、123.126.48.47、123.126.48.48
+		echo $vid."\n";
 		$sub_ip = array('220.181.118.53','220.181.19.218','220.181.118.181','123.126.48.47','123.126.48.48');
 		$ip_status = self::rolling_curl_code($sub_ip); //curl 并发获得ip是否可以访问，返回的都可以访问
 		$sub_ip = array_keys($ip_status);//提取ip	
@@ -39,6 +41,32 @@ class Sohu {
 		}
 		*/
 		$api_url = "http://".$sub_ip[0]."/vrs_flash.action?vid={$vid}&af=1&out=-1&g=8&r=2&t=0.".mt_rand(100,999);
+		echo "api_url:{$api_url}\n";
+		$data = self::GetAPIJson($api_url);
+		if(is_array($data)&& !empty($data['super']))
+		{
+			return $data;
+		}
+		else
+		{
+			echo "data is emtpy try jhtml\n";
+			$api_url = "http://my.tv.sohu.com/videinfo.jhtml?m=viewtv&vid={$vid}";
+			echo $api_url."\n";
+			$data = self::GetAPIJson($api_url);
+			if(is_array($data))
+			{
+				return $data;
+			}
+			else
+			{
+				echo "data is emtpy no try\n";
+				return false;
+			}
+		}
+	}
+
+	//获取Json地址
+	private static function GetAPIJson($api_url){
 		$video_datas = json_decode(Base::_cget($api_url),true);
 		if(is_array($video_datas)&& !empty($video_datas['data'])){
 			$video_data = $video_datas['data'];
@@ -51,7 +79,9 @@ class Sohu {
 			if($video_data['superVid']) $data['super'] = self::parseVideoUrl($video_data['superVid'],$sub_ip);
 			if($video_data['oriVid']) $data['original'] = self::parseVideoUrl($video_data['oriVid'],$sub_ip);
 			return $data;
-		}else{
+		}
+		else
+		{
 			return false;
 		}
 	}
@@ -83,8 +113,70 @@ class Sohu {
 			$data = $data_urls;
 			return $data;
 		}else{
+			echo "parseVideoUrl try jhtml\n";
+			$api_url = "http://my.tv.sohu.com/videinfo.jhtml?m=viewtv&vid={$vid}";
+			$video_data = json_decode(Base::_cget($api_url),true);
+			$rands = mt_rand(1,22);
+			$data = $urls = $data_urls = $params = array();
+			if(is_array($video_data)&& !empty($video_data)){
+				foreach($video_data['data']['clipsURL'] as $key => $val){
+					$su_key = $video_data['data']['su'][$key];
+					$url = "http://".$video_data['allot']."/?prot=".$video_data['prot']."&file=".ltrim($val,"http://data.vod.itc.cn")."&new=".$su_key;
+					echo "url:{$url}\n";
+					$urls[$key] = $url;
+					$params[$key]['su_key'] = $su_key;
+					$params[$key]['rands'] = $rands;
+					echo "urls:{$key},{$urls[$key]}\n";
+					echo "urls:{$key},{$params[$key]['su_key']}\n";
+					echo "urls:{$key},{$params[$key]['rands']}\n";
+					/*  //这里一次只能获取一段视频，速度慢
+					$param_array = explode("|",Base::_cget($url));
+					//视频截图地址 http://data.vod.itc.cn/preview?file=/233/52/28FAAL9Tq9UX9kOatm6bj7.mp4&start=28 
+					//相对视频地址 中间多了个thumb http://219.238.10.45/sohu/thumb/1/233/52/28FAAL9Tq9UX9kOatm6bj7.mp4?start=28&key=uGacwCdCKICxxJnliepKI_od5tZlsh3ONPL_ow..&n=13&a=4019&cip=101.39.251.131
+					$video_url = substr($param_array[0],0,-1).$su_key."?start=&key=" .$param_array[3]."&n=".$rands."&a=4019";
+					$data[] = $video_url;
+					*/
+				}
+				//curl 并发获取视频地址 排序
+				$data_urls = self::rolling_curl_url($urls,$params);
+				ksort($data_urls);
+				$data = $data_urls;
+				return $data;
+			}
 			return false;
 		}
+	}
+
+	//另外一种解析视频的方法 速度慢
+	private static function parseVideoUrl3($vid,$sub_ip){
+		$data = $urls = $data_urls=  array();
+		$api_url = "http://my.tv.sohu.com/videinfo.jhtml?m=viewtv&vid={$vid}";
+		$video_data = json_decode(Base::_cget($api_url),true);
+		if(is_array($video_data)&& !empty($video_data)){
+			foreach($video_data['data']['clipsURL'] as $key => $val){
+				$su_key = $video_data['data']['su'][$key];
+				$url = "http://data.vod.itc.cn/preview?file=".$su_key;
+				$urls[] = $url;
+				/*curl 获取header 
+				$headers = Base::getHeader($url);
+				preg_match("#Location:\s*(.+)#",$headers,$locations);
+				$param_array = $locations[1];
+				*/
+				/* //一次获得一个视频地址的，速度慢	
+				$param_array = get_headers($url,1);
+				//视频截图地址 http://data.vod.itc.cn/preview?file=/233/52/28FAAL9Tq9UX9kOatm6bj7.mp4&start=28 
+				//相对视频地址 中间多了个thumb http://219.238.10.45/sohu/thumb/1/233/52/28FAAL9Tq9UX9kOatm6bj7.mp4?start=28&key=uGacwCdCKICxxJnliepKI_od5tZlsh3ONPL_ow..&n=13&a=4019&cip=101.39.251.131
+				$video_url = str_replace('/thumb/', '/',$param_array['Location']); //获得地址转向
+				$data[] = $video_url;
+				*/
+			}
+			$data_urls = self::rolling_curl_url2($urls);
+			ksort($data_urls); //获得数组根据key值排序
+			$data = array_values($data_urls);
+			return $data;
+		}else{
+			return false;
+		}		
 	}
 
 	//另外一种解析视频的方法 速度慢
@@ -267,5 +359,24 @@ class Sohu {
         } while ($active);
         curl_multi_close($queue);
         return $responses;
+	}
+
+	static public function WriteUrlTxt($file,$Content){
+		echo $file."============\n";
+		//文件被清空后再写入 
+		$fp = fopen($file, "w");
+		if($fp) 
+		{ 
+			$flag=fwrite($fp,$Content); 
+			if(!$flag) 
+			{ 
+				echo "写入文件失败:$file"."\n"; 
+			} 
+		}
+		else 
+		{ 
+			echo "打开文件失败:$file"."\n"; 
+		}
+		fclose($fp);
 	}
 }

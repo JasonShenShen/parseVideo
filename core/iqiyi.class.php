@@ -9,6 +9,7 @@ class Iqiyi {
 	public static function parse($url){
 		$html = Base::_cget($url);
 		$data = $tvids = $vids = $tvnames = array();
+		#self::WriteUrlTxt("iqiyi_video_parse.html",$html);
 		preg_match('#data-(player|drama)-tvid="([^"]+)"#iU',$html,$tvids);
 		preg_match('#data-(player|drama)-videoid="([^"]+)"#iU',$html,$vids);
 		preg_match('#data-videodownload-tvname="([^"]+)"#iU',$html,$tvnames);
@@ -90,78 +91,64 @@ class Iqiyi {
 	 * @return [type]       [description]
 	 */
 	private static function parseFlv2($tvid,$vid){
-	
-
-		$api_url = "http://cache.video.qiyi.com/vms?key=fvip&src=1702633101b340d8917a69cf8a4b8c7c";
-		$api_url = $api_url."&tvId=".$tvid."&vid=".$vid."&vinfo=1&tm=".self::$deadpara."&enc=".static::calenc($tvid)."&qyid=08ca8cb480c0384cb5d3db068161f44f&&puid=&authKey=".static::calauthKey($tvid)."&tn=".static::randomFloat();
-		
-
-
+		// $api_url = "http://cache.video.qiyi.com/vms?key=fvip&src=1702633101b340d8917a69cf8a4b8c7c";
+		// $api_url = $api_url."&tvId=".$tvid."&vid=".$vid."&vinfo=1&tm=".self::$deadpara."&enc=".static::calenc($tvid)."&qyid=08ca8cb480c0384cb5d3db068161f44f&&puid=&authKey=".static::calauthKey($tvid)."&tn=".static::randomFloat();
+		$api_url = "http://cache.video.qiyi.com/vd/";
+		$api_url = $api_url."$tvid/$vid/";
+		echo "api_url:$api_url\n";
 		$video_datas = json_decode(Base::_cget($api_url),true);
-
-
-		$vs = $video_datas['data']['vp']['tkl'][0]['vs'];    //.data.vp.tkl[0].vs
-
-
+		#print_r($video_datas);
+		$vs = $video_datas['tkl'][0]['vs'];    //.data.vp.tkl[0].vs
 		$time_url = "http://data.video.qiyi.com/t?tn=".static::randomFloat();
-
-
 		$time_datas = json_decode(Base::_cget($time_url),true);
-		
-
+		echo "time_url:$time_url\n";
 		$server_time = $time_datas['t'];  
-
-
+		echo "server_time:$server_time\n";
+		#print_r($vs);
 	    $urls_data = $data = array();
 		if(is_array($vs) && count($vs)>0){
 			foreach($vs as $val){
 				//720p 和1080p 的视频地址暂时无法获得。
 				$data['seconds'] = $val['duration'];
+				#echo "val:$v['fs']\n";
 				foreach ($val['fs'] as $v){
-
 					$this_link = $v['l'];
-                   
-
-
+					echo "val:".$val['bid']."\n";
 					if($val['bid'] ==  4 || $val['bid'] ==  5 || $val['bid'] ==  10){
  						$this_link = static::getVrsEncodeCode($this_link);
 					}
  					$sp = explode('/',$this_link);
                     $sp_length = count($sp);
-
                     $fileId = explode('.',$sp[$sp_length-1])[0];
 				    $this_key = static::calmd($server_time,$fileId);
-					
-                   
-
-
-					$this_link = $this_link.'?ran='.self::$deadpara.'&qyid=08ca8cb480c0384cb5d3db068161f44f&qypid='.$tvid.'_11&retry=1';
-
-					$final_url = "http://data.video.qiyi.com/".$this_key."/videos".$this_link;
-
-					if($val['bid'] ==  96)$urls_data['fluent'][] = $final_url;
-					if($val['bid'] ==  1)$urls_data['normal'][] = $final_url;
-					if($val['bid'] ==  2)$urls_data['high'][] = $final_url;
-					if($val['bid'] ==  3)$urls_data['super'][] = $final_url;
-					if($val['bid'] ==  4)$urls_data['SUPER_HIGH'][] = $final_url;
-					if($val['bid'] ==  5)$urls_data['FULL_HD'][] = $final_url;
-					if($val['bid'] ==  10)$urls_data['FOUR_K'][] = $final_url;
+				    $this_link = $this_link.'?ran='.self::$deadpara.'&qyid=08ca8cb480c0384cb5d3db068161f44f&qypid='.$tvid.'_11&retry=1';
+				    $final_url = "http://data.video.qiyi.com/".$this_key."/videos".$this_link;
+				    if($val['bid'] ==  96)$urls_data['fluent'] = $final_url;
+					if($val['bid'] ==  1)$urls_data['normal'] = $final_url;
+					if($val['bid'] ==  2)$urls_data['high'] = $final_url;
+					if($val['bid'] ==  3)$urls_data['super'] = $final_url;
+					if($val['bid'] ==  4)$urls_data['SUPER_HIGH'] = $final_url;
+					if($val['bid'] ==  5)$urls_data['FULL_HD'] = $final_url;
+					if($val['bid'] ==  10)$urls_data['FOUR_K'] = $final_url;
 				}
-				
 			}
-
-			if(!empty($urls_data['fluent'])) $data['极速'] = self::getVideoUrl($urls_data['fluent']);
-			if(!empty($urls_data['normal'])) $data['流畅'] = self::getVideoUrl($urls_data['normal']);
-			if(!empty($urls_data['high'])) $data['高清'] = self::getVideoUrl($urls_data['high']);
-			if(!empty($urls_data['super'])) $data['超清'] = self::getVideoUrl($urls_data['super']);
-			if(!empty($urls_data['SUPER_HIGH'])) $data['720P'] = self::getVideoUrl($urls_data['SUPER_HIGH']);
-			if(!empty($urls_data['FULL_HD'])) $data['1080P'] = self::getVideoUrl($urls_data['FULL_HD']);
-			if(!empty($urls_data['FOUR_K'])) $data['4K'] = self::getVideoUrl($urls_data['FOUR_K']);
-
-			
-
+			if(!empty($urls_data['fluent'])) $data['fluent'] = self::getVideoUrl($urls_data['fluent']);
+			if(!empty($urls_data['normal'])) $data['normal'] = self::getVideoUrl($urls_data['normal']);
+			if(!empty($urls_data['high'])) $data['high'] = self::getVideoUrl($urls_data['high']);
+			if(!empty($urls_data['super'])) $data['super'] = self::getVideoUrl($urls_data['super']);
+			if(!empty($urls_data['SUPER_HIGH'])) $data['SUPER_HIGH'] = self::getVideoUrl($urls_data['SUPER_HIGH']);
+			if(!empty($urls_data['FULL_HD'])) $data['FULL_HD'] = self::getVideoUrl($urls_data['FULL_HD']);
+			if(!empty($urls_data['FOUR_K'])) $data['FOUR_K'] = self::getVideoUrl($urls_data['FOUR_K']);
+			// if(!empty($urls_data['fluent'])) $data['极速'] = self::getVideoUrl($urls_data['fluent']);
+			// if(!empty($urls_data['normal'])) $data['流畅'] = self::getVideoUrl($urls_data['normal']);
+			// if(!empty($urls_data['high'])) $data['高清'] = self::getVideoUrl($urls_data['high']);
+			// if(!empty($urls_data['super'])) $data['超清'] = self::getVideoUrl($urls_data['super']);
+			// if(!empty($urls_data['SUPER_HIGH'])) $data['720P'] = self::getVideoUrl($urls_data['SUPER_HIGH']);
+			// if(!empty($urls_data['FULL_HD'])) $data['1080P'] = self::getVideoUrl($urls_data['FULL_HD']);
+			// if(!empty($urls_data['FOUR_K'])) $data['4K'] = self::getVideoUrl($urls_data['FOUR_K']);
 			return $data;
 		}else{
+			echo "解析失败\n";
 			return false;
 		}
 	}
@@ -172,8 +159,8 @@ class Iqiyi {
 	 * @return [type]           [description]
 	 */
 	private static function getVideoUrl($url_data){
-
-
+		$video_url_datas = json_decode(Base::_cget($url_data),true);
+		#print_r($video_url_datas);
 		//http://data.video.qiyi.com/4739e996fde3348eeef0da8684310ab4/videos/v0/20141221/38/e6/1974401616a8737fa3dd595db0eaefba.f4v
 		//现在返回的是这个地址，客户端需要请求这个地址然后返回下面的数据，l是最终的下载地址，因为这个下载地址是有时间限制的，如果无法下载，请再次请求上面那个url，重新返回真正的下载地址
 
@@ -201,7 +188,7 @@ class Iqiyi {
 		// }
 
 		// return $urls;
-		return $url_data;
+		return $video_url_datas['l'];
 	}
 
 	/**
@@ -262,5 +249,24 @@ class Iqiyi {
     	
     	// return json_decode($data,true);
     	return $data;
-    }			
+    }
+
+    static public function WriteUrlTxt($file,$Content){
+		echo $file."============\n";
+		//文件被清空后再写入 
+		$fp = fopen($file, "w");
+		if($fp) 
+		{ 
+			$flag=fwrite($fp,$Content); 
+			if(!$flag) 
+			{ 
+				echo "写入文件失败:$file"."\n"; 
+			} 
+		}
+		else 
+		{ 
+			echo "打开文件失败:$file"."\n"; 
+		}
+		fclose($fp);
+	}
 }

@@ -12,11 +12,14 @@ class Letv {
 			return false;
 			exit(0);
 		}else{
+			echo "vid:".$vid."\n"; 
 			$tkey = Letv::getKey(time());
 			//通过解析 乐视 的xml 来获得视频地址 tkey值需要计算  
-			$xml_url = "http://api.letv.com/mms/out/video/play?id={$vid}&platid=1&splatid=101&format=0&tkey={$tkey}&domain=www.letv.com";
+			$xml_url = "http://api.letv.com/mms/out/video/playJson?id={$vid}&platid=1&splatid=101&format=0&tkey={$tkey}&domain=www.letv.com";
+			echo "xml_url:".$xml_url."\n"; 
 			$video_data = Letv::parseXml($xml_url);
 			if($video_data){
+				Letv::WriteUrlTxt("video_data_file.txt",$video_data);
 				//存有视频的数组 有 dispatch dispatchbak dispatchbak1 dispatchbak2  这里使用 dispatch
 				if(is_array($video_data['dispatch'])&&!empty($video_data['dispatch'])){
 					foreach($video_data['dispatch'] as $key =>$val){
@@ -32,6 +35,7 @@ class Letv {
 				$data['seconds'] = $video_data['duration'];	
 				return $data;			
 			}else{
+				echo "解析失败";
 				return false;
 			}
 		}
@@ -91,5 +95,25 @@ class Letv {
 			return false;
 		}
 		
+	}
+
+	static public function WriteUrlTxt($file,$Content){
+		echo $file."============\n";
+		echo $Content."==========\n";
+		//文件被清空后再写入 
+		$fp = fopen($file, "w");
+		if($fp) 
+		{ 
+			$flag=fwrite($fp,$Content); 
+			if(!$flag) 
+			{ 
+				echo "写入文件失败:$file"."\n"; 
+			} 
+		}
+		else 
+		{ 
+			echo "打开文件失败:$file"."\n"; 
+		}
+		fclose($fp);
 	}
 }

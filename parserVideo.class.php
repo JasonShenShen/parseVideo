@@ -1,13 +1,13 @@
 <?php
-////自动加载core里的class
-//define('CLASS_DIR', 'core/');
-//// Add your class dir to include path
-//set_include_path(str_replace("\\","/",__DIR__."/".CLASS_DIR));
-//// You can use this trick to make autoloader look for commonly used "My.class.php" type filenames
-//spl_autoload_extensions('.class.php');
-//// Use default autoload implementation
-//spl_autoload_register();
-//require 'youku.class.php';
+//自动加载core里的class
+define('CLASS_DIR', 'core/');
+// Add your class dir to include path
+set_include_path(str_replace("\\","/",__DIR__."/".CLASS_DIR));
+// You can use this trick to make autoloader look for commonly used "My.class.php" type filenames
+spl_autoload_extensions('.class.php');
+// Use default autoload implementation
+spl_autoload_register();
+
 
 class ParserVideo
 {
@@ -24,7 +24,7 @@ class ParserVideo
         $lowerurl = strtolower($url);
         preg_match(self::CHECK_URL_VALID, $lowerurl, $matches);
         if(!$matches) return self::getFlvcdUrl($url);
-        echo "$matches[1]=====\n";
+
         switch($matches[1]){
             case 'youku.com':
                 $data = self::_parseYouku($url);
